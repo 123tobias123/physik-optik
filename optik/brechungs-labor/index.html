@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Brechungs-Labor</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
+
+  :root {
+    --night: #0d1b2a;
+    --night-2: #16263a;
+    --beam: #ffd84d;
+    --beam-glow: #ffe98a;
+    --water: #2a9fd6;
+    --water-deep: #1a6fa0;
+    --normal: #ff6b9d;
+    --ink: #eaf2ff;
+    --muted: #8ba3c7;
+    --correct: #6bffb0;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Fredoka', sans-serif;
+    background: radial-gradient(circle at 50% 0%, var(--night-2), var(--night));
+    color: var(--ink);
+    min-height: 100vh;
+    padding: 20px;
+    display: flex;
+    justify-content: center;
+  }
+
+  .wrap { width: 100%; max-width: 920px; }
+
+  header { text-align: center; margin-bottom: 18px; }
+
+  .eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--water);
+  }
+
+  h1 {
+    font-size: 34px;
+    font-weight: 700;
+    letter-spacing: -1px;
+    margin: 2px 0 6px;
+  }
+
+  .sub { color: var(--muted); font-size: 15px; }
+
+  .stage {
+    position: relative;
+    background: linear-gradient(180deg, #0a1622, #0e1f33);
+    border: 1px solid #24364f;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 20px 50px rgba(0,0,0,.4);
+    touch-action: none;
+  }
+
+  svg { display: block; width: 100%; height: auto; cursor: grab; }
+  svg.dragging { cursor: grabbing; }
+
+  .medium-pick {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin: 14px 0 2px;
+  }
+  .medium-pick button {
+    font-family: 'Fredoka', sans-serif;
+    font-size: 15px;
+    font-weight: 500;
+    background: #1c3050;
+    color: var(--ink);
+    border: 2px solid transparent;
+    border-radius: 12px;
+    padding: 10px 20px;
+    cursor: pointer;
+    transition: transform .12s, background .2s, border-color .2s;
+  }
+  .medium-pick button:hover { transform: translateY(-2px); background: #244064; }
+  .medium-pick button.active { border-color: var(--water); background: rgba(42,159,214,.2); }
+
+  .panel {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-top: 16px;
+  }
+
+  .card {
+    background: #13243a;
+    border: 1px solid #25395a;
+    border-radius: 16px;
+    padding: 16px 18px;
+  }
+
+  .card h3 {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  .angles { display: flex; gap: 22px; }
+  .angle-box { flex: 1; }
+  .angle-label { font-size: 13px; color: var(--muted); }
+  .angle-val {
+    font-family: 'Space Mono', monospace;
+    font-size: 30px;
+    font-weight: 700;
+  }
+  .angle-val.in { color: var(--beam); }
+  .angle-val.out { color: var(--water); }
+
+  .law { font-size: 15px; color: var(--ink); line-height: 1.5; }
+  .law strong { color: var(--correct); }
+
+  .quiz { grid-column: 1 / -1; }
+  .quiz p.q { font-size: 17px; margin-bottom: 12px; font-weight: 500; }
+  .opts { display: flex; gap: 10px; flex-wrap: wrap; }
+  .opt {
+    font-family: 'Fredoka', sans-serif;
+    font-size: 16px;
+    font-weight: 500;
+    background: #1c3050;
+    color: var(--ink);
+    border: 2px solid transparent;
+    border-radius: 12px;
+    padding: 12px 20px;
+    cursor: pointer;
+    transition: transform .12s, background .2s, border-color .2s;
+  }
+  .opt:hover { transform: translateY(-2px); background: #244064; }
+  .opt.right { border-color: var(--correct); background: rgba(107,255,176,.15); }
+  .opt.wrong { border-color: #ff6b6b; background: rgba(255,107,107,.12); }
+
+  .feedback { margin-top: 12px; font-size: 15px; min-height: 22px; }
+  .feedback.ok { color: var(--correct); }
+  .feedback.no { color: #ff9b9b; }
+
+  .hint {
+    text-align: center;
+    color: var(--muted);
+    font-size: 14px;
+    margin-top: 12px;
+  }
+
+  @media (max-width: 640px) {
+    .panel { grid-template-columns: 1fr; }
+    h1 { font-size: 26px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Physik · Optik</div>
+    <h1>Brechungs-Labor</h1>
+    <p class="sub">Ziehe die Lampe und sieh, wie das Licht im Wasser den Knick macht.</p>
+  </header>
+
+  <div class="stage">
+    <svg id="sim" viewBox="0 0 800 460" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="4" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+        <linearGradient id="waterGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="var(--water)" stop-opacity="0.55"/>
+          <stop offset="100%" stop-color="var(--water-deep)" stop-opacity="0.75"/>
+        </linearGradient>
+      </defs>
+
+      <!-- water / lower medium -->
+      <rect x="0" y="230" width="800" height="230" fill="url(#waterGrad)"/>
+      <!-- surface line -->
+      <line x1="0" y1="230" x2="800" y2="230" stroke="var(--water)" stroke-width="3" opacity="0.9"/>
+      <text id="topLabel" x="20" y="40" fill="var(--muted)" font-family="Fredoka" font-size="15">Luft</text>
+      <text id="botLabel" x="20" y="430" fill="var(--ink)" font-family="Fredoka" font-size="15" opacity="0.85">Wasser</text>
+
+      <!-- normal line (dashed) -->
+      <line id="normal" x1="400" y1="70" x2="400" y2="400" stroke="var(--normal)" stroke-width="2" stroke-dasharray="7 7" opacity="0.8"/>
+      <text x="408" y="100" fill="var(--normal)" font-family="Space Mono" font-size="13">Lot</text>
+
+      <!-- incoming beam (air) -->
+      <line id="incoming" x1="0" y1="0" x2="400" y2="230" stroke="var(--beam)" stroke-width="4" filter="url(#glow)" stroke-linecap="round"/>
+      <!-- refracted beam (water) -->
+      <line id="refracted" x1="400" y1="230" x2="400" y2="400" stroke="var(--beam-glow)" stroke-width="4" filter="url(#glow)" stroke-linecap="round" opacity="0.95"/>
+
+      <!-- angle arcs -->
+      <path id="arcIn" fill="none" stroke="var(--beam)" stroke-width="2.5"/>
+      <path id="arcOut" fill="none" stroke="var(--water)" stroke-width="2.5"/>
+
+      <!-- hit point -->
+      <circle id="hitDot" cx="400" cy="230" r="6" fill="#fff"/>
+
+      <!-- lamp (draggable) -->
+      <g id="lamp" style="cursor:grab">
+        <circle cx="0" cy="0" r="26" fill="var(--beam)" filter="url(#glow)"/>
+        <circle cx="0" cy="0" r="14" fill="#fff7d6"/>
+        <text x="0" y="46" text-anchor="middle" fill="var(--ink)" font-family="Fredoka" font-size="14" font-weight="600">Lampe</text>
+      </g>
+    </svg>
+  </div>
+
+  <div class="medium-pick">
+    <button id="mWater" class="active">Wasser</button>
+    <button id="mGlass">Glas</button>
+  </div>
+
+  <p class="hint">Tipp: Ziehe die Lampe mit dem Finger oder der Maus.</p>
+
+  <div class="panel">
+    <div class="card">
+      <h3>Gemessene Winkel</h3>
+      <div class="angles">
+        <div class="angle-box">
+          <div class="angle-label">Einfallswinkel (Luft)</div>
+          <div class="angle-val in"><span id="angIn">40</span>°</div>
+        </div>
+        <div class="angle-box">
+          <div class="angle-label">Brechungswinkel</div>
+          <div class="angle-val out"><span id="angOut">29</span>°</div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Was passiert hier?</h3>
+      <p class="law">Geht Licht von Luft ins <strong>dichtere</strong> Medium, wird es <strong>zum Lot hin</strong> gebrochen – der Strahl macht einen Knick. In Glas ist der Knick stärker als in Wasser.</p>
+    </div>
+
+    <div class="card quiz">
+      <h3>Mini-Quiz</h3>
+      <p class="q" id="qText"></p>
+      <div class="opts" id="opts"></div>
+      <div class="feedback" id="fb"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const svg = document.getElementById('sim');
+const lamp = document.getElementById('lamp');
+const incoming = document.getElementById('incoming');
+const refracted = document.getElementById('refracted');
+const arcIn = document.getElementById('arcIn');
+const arcOut = document.getElementById('arcOut');
+const angInEl = document.getElementById('angIn');
+const angOutEl = document.getElementById('angOut');
+const botLabel = document.getElementById('botLabel');
+
+const HIT = { x: 400, y: 230 };   // point on surface
+let lampPos = { x: 230, y: 70 };
+let nMedium = 1.33;               // refractive index (water default)
+
+function toSvg(evt) {
+  const pt = svg.createSVGPoint();
+  const t = evt.touches ? evt.touches[0] : evt;
+  pt.x = t.clientX; pt.y = t.clientY;
+  return pt.matrixTransform(svg.getScreenCTM().inverse());
+}
+
+function render() {
+  // clamp lamp into the air region (above surface)
+  lampPos.x = Math.max(20, Math.min(780, lampPos.x));
+  lampPos.y = Math.max(20, Math.min(200, lampPos.y));
+
+  lamp.setAttribute('transform', `translate(${lampPos.x},${lampPos.y})`);
+
+  // incoming beam: lamp -> hit
+  incoming.setAttribute('x1', lampPos.x);
+  incoming.setAttribute('y1', lampPos.y);
+  incoming.setAttribute('x2', HIT.x);
+  incoming.setAttribute('y2', HIT.y);
+
+  // incidence angle from vertical normal
+  const dx = lampPos.x - HIT.x;
+  const dy = HIT.y - lampPos.y;            // positive (lamp above)
+  let aIn = Math.atan2(Math.abs(dx), dy) * 180 / Math.PI;
+  aIn = Math.max(0, Math.min(80, aIn));
+
+  // Snell: sin(in) = n * sin(out)  ->  out smaller
+  const aInRad = aIn * Math.PI / 180;
+  const sinOut = Math.sin(aInRad) / nMedium;
+  const aOut = Math.asin(Math.min(1, sinOut)) * 180 / Math.PI;
+
+  // refracted beam continues on same side of normal, into water
+  const len = 200;
+  const sign = dx >= 0 ? 1 : -1;
+  const aOutRad = aOut * Math.PI / 180;
+  const rx = HIT.x + sign * Math.sin(aOutRad) * len;
+  const ry = HIT.y + Math.cos(aOutRad) * len;
+  refracted.setAttribute('x1', HIT.x);
+  refracted.setAttribute('y1', HIT.y);
+  refracted.setAttribute('x2', rx);
+  refracted.setAttribute('y2', ry);
+
+  angInEl.textContent = Math.round(aIn);
+  angOutEl.textContent = Math.round(aOut);
+
+  // arcs (incidence above surface, refraction below)
+  drawArc(arcIn, dx >= 0 ? 1 : -1, aIn, true);
+  drawArc(arcOut, sign, aOut, false);
+}
+
+function drawArc(el, side, ang, above) {
+  const r = 48;
+  const a = ang * Math.PI / 180;
+  const dirY = above ? -1 : 1;             // up for incidence, down for refraction
+  const x0 = HIT.x;
+  const y0 = HIT.y + dirY * r;
+  const x1 = HIT.x + side * Math.sin(a) * r;
+  const y1 = HIT.y + dirY * Math.cos(a) * r;
+  // sweep flag chosen so the arc bows toward the beam
+  const sweep = (side * dirY > 0) ? 0 : 1;
+  el.setAttribute('d', `M ${x0} ${y0} A ${r} ${r} 0 0 ${sweep} ${x1} ${y1}`);
+}
+
+// drag handling
+let dragging = false;
+function start(e){ dragging = true; svg.classList.add('dragging'); e.preventDefault(); }
+function move(e){
+  if(!dragging) return;
+  const p = toSvg(e);
+  lampPos.x = p.x; lampPos.y = p.y;
+  render();
+  e.preventDefault();
+}
+function end(){ dragging = false; svg.classList.remove('dragging'); }
+
+lamp.addEventListener('mousedown', start);
+lamp.addEventListener('touchstart', start, {passive:false});
+window.addEventListener('mousemove', move);
+window.addEventListener('touchmove', move, {passive:false});
+window.addEventListener('mouseup', end);
+window.addEventListener('touchend', end);
+
+// medium switch
+const mWater = document.getElementById('mWater');
+const mGlass = document.getElementById('mGlass');
+mWater.onclick = () => { nMedium = 1.33; botLabel.textContent = 'Wasser'; mWater.classList.add('active'); mGlass.classList.remove('active'); render(); };
+mGlass.onclick = () => { nMedium = 1.50; botLabel.textContent = 'Glas'; mGlass.classList.add('active'); mWater.classList.remove('active'); render(); };
+
+render();
+
+// ---- Quiz ----
+const questions = [
+  { q: "Licht geht aus der Luft ins Wasser. In welche Richtung wird es gebrochen?",
+    opts: ["Vom Lot weg", "Zum Lot hin", "Gar nicht"], correct: 1,
+    why: "Richtig! Ins dichtere Medium wird zum Lot hin gebrochen." },
+  { q: "In welchem Stoff ist der Knick des Lichtstrahls stärker?",
+    opts: ["In Wasser", "In Glas", "Gleich stark"], correct: 1,
+    why: "Genau! Glas ist optisch dichter, also knickt der Strahl stärker." },
+  { q: "Wie nennt man die senkrechte Hilfslinie an der Wasseroberfläche?",
+    opts: ["Strahl", "Lot", "Spiegel"], correct: 1,
+    why: "Stimmt! Beide Winkel misst man zum Lot." },
+  { q: "Der Brechungswinkel im Wasser ist im Vergleich zum Einfallswinkel …",
+    opts: ["größer", "kleiner", "genau gleich"], correct: 1,
+    why: "Korrekt! Beim Eintritt ins Wasser wird der Winkel kleiner." },
+];
+let qi = 0;
+
+function loadQ() {
+  const item = questions[qi];
+  document.getElementById('qText').textContent = item.q;
+  const box = document.getElementById('opts');
+  box.innerHTML = '';
+  document.getElementById('fb').textContent = '';
+  document.getElementById('fb').className = 'feedback';
+  item.opts.forEach((o, i) => {
+    const b = document.createElement('button');
+    b.className = 'opt';
+    b.textContent = o;
+    b.onclick = () => answer(i, b);
+    box.appendChild(b);
+  });
+}
+
+function answer(i, btn) {
+  const item = questions[qi];
+  const fb = document.getElementById('fb');
+  const all = document.querySelectorAll('.opt');
+  all.forEach(b => b.onclick = null);
+  if (i === item.correct) {
+    btn.classList.add('right');
+    fb.textContent = item.why;
+    fb.className = 'feedback ok';
+    setTimeout(() => { qi = (qi + 1) % questions.length; loadQ(); }, 1600);
+  } else {
+    btn.classList.add('wrong');
+    all[item.correct].classList.add('right');
+    fb.textContent = "Nicht ganz – schau dir die richtige Antwort an.";
+    fb.className = 'feedback no';
+    setTimeout(() => loadQ(), 2000);
+  }
+}
+
+loadQ();
+</script>
+</body>
+</html>
