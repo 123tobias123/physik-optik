@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Farben-Labor</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
+
+  :root {
+    --night: #0d1b2a;
+    --night-2: #16263a;
+    --ink: #eaf2ff;
+    --muted: #8ba3c7;
+    --correct: #6bffb0;
+    --r: #ff4d4d;
+    --g: #4dff66;
+    --b: #4d7dff;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Fredoka', sans-serif;
+    background: radial-gradient(circle at 50% 0%, var(--night-2), var(--night));
+    color: var(--ink); min-height: 100vh; padding: 20px;
+    display: flex; justify-content: center;
+  }
+  .wrap { width: 100%; max-width: 920px; }
+  header { text-align: center; margin-bottom: 18px; }
+  .eyebrow { font-family: 'Space Mono', monospace; font-size: 12px; letter-spacing: 3px; text-transform: uppercase; color: var(--g); }
+  h1 { font-size: 34px; font-weight: 700; letter-spacing: -1px; margin: 2px 0 6px; }
+  .sub { color: var(--muted); font-size: 15px; }
+
+  .stage {
+    position: relative; background: #05080d;
+    border: 1px solid #24364f; border-radius: 20px; overflow: hidden;
+    box-shadow: 0 20px 50px rgba(0,0,0,.4);
+  }
+  svg { display: block; width: 100%; height: auto; }
+
+  .toggles { display: flex; gap: 12px; justify-content: center; margin: 16px 0 2px; flex-wrap: wrap; }
+  .toggle {
+    font-family: 'Fredoka', sans-serif; font-size: 16px; font-weight: 600;
+    border: 2px solid; border-radius: 999px; padding: 12px 26px; cursor: pointer;
+    background: transparent; transition: transform .12s, background .2s, opacity .2s;
+    opacity: 0.45;
+  }
+  .toggle:hover { transform: translateY(-2px); }
+  .toggle.on { opacity: 1; }
+  .toggle.red   { color: var(--r); border-color: var(--r); }
+  .toggle.green { color: var(--g); border-color: var(--g); }
+  .toggle.blue  { color: var(--b); border-color: var(--b); }
+  .toggle.red.on   { background: rgba(255,77,77,.18); }
+  .toggle.green.on { background: rgba(77,255,102,.18); }
+  .toggle.blue.on  { background: rgba(77,125,255,.18); }
+
+  .panel { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 16px; }
+  .card { background: #13243a; border: 1px solid #25395a; border-radius: 16px; padding: 16px 18px; }
+  .card h3 { font-size: 13px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+  .law { font-size: 15px; color: var(--ink); line-height: 1.5; }
+  .law strong { color: var(--correct); }
+
+  .mix-name { font-family: 'Space Mono', monospace; font-size: 26px; font-weight: 700; }
+
+  .quiz { grid-column: 1 / -1; }
+  .quiz p.q { font-size: 17px; margin-bottom: 12px; font-weight: 500; }
+  .opts { display: flex; gap: 10px; flex-wrap: wrap; }
+  .opt {
+    font-family: 'Fredoka', sans-serif; font-size: 16px; font-weight: 500;
+    background: #1c3050; color: var(--ink); border: 2px solid transparent;
+    border-radius: 12px; padding: 12px 20px; cursor: pointer;
+    transition: transform .12s, background .2s, border-color .2s;
+  }
+  .opt:hover { transform: translateY(-2px); background: #244064; }
+  .opt.right { border-color: var(--correct); background: rgba(107,255,176,.15); }
+  .opt.wrong { border-color: #ff6b6b; background: rgba(255,107,107,.12); }
+  .feedback { margin-top: 12px; font-size: 15px; min-height: 22px; }
+  .feedback.ok { color: var(--correct); }
+  .feedback.no { color: #ff9b9b; }
+  .hint { text-align: center; color: var(--muted); font-size: 14px; margin-top: 12px; }
+
+  @media (max-width: 640px) { .panel { grid-template-columns: 1fr; } h1 { font-size: 26px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Physik · Optik</div>
+    <h1>Farben-Labor</h1>
+    <p class="sub">Schalte die farbigen Scheinwerfer ein und mische Licht.</p>
+  </header>
+
+  <div class="stage">
+    <svg id="sim" viewBox="0 0 800 420" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="soft"><feGaussianBlur stdDeviation="22"/></filter>
+      </defs>
+      <g filter="url(#soft)" style="mix-blend-mode:screen">
+        <circle id="cRed"   cx="330" cy="180" r="150" fill="#ff0000" opacity="0"/>
+        <circle id="cGreen" cx="470" cy="180" r="150" fill="#00ff00" opacity="0"/>
+        <circle id="cBlue"  cx="400" cy="290" r="150" fill="#0000ff" opacity="0"/>
+      </g>
+      <text x="400" y="395" text-anchor="middle" fill="#33506f" font-family="Fredoka" font-size="14">Drei Lichtkegel auf einer weißen Wand</text>
+    </svg>
+  </div>
+
+  <div class="toggles">
+    <button id="tRed"   class="toggle red">Rot</button>
+    <button id="tGreen" class="toggle green">Grün</button>
+    <button id="tBlue"  class="toggle blue">Blau</button>
+  </div>
+
+  <p class="hint">Tipp: Schalte zwei oder drei Farben gleichzeitig ein.</p>
+
+  <div class="panel">
+    <div class="card">
+      <h3>Deine Mischung</h3>
+      <p class="mix-name" id="mixName">Noch nichts an</p>
+    </div>
+    <div class="card">
+      <h3>Was passiert hier?</h3>
+      <p class="law">Beim Licht ist das anders als bei Farbstiften: Hier wird <strong>addiert</strong>. Rot + Grün + Blau ergibt zusammen <strong>Weiß</strong>.</p>
+    </div>
+
+    <div class="card quiz">
+      <h3>Mini-Quiz</h3>
+      <p class="q" id="qText"></p>
+      <div class="opts" id="opts"></div>
+      <div class="feedback" id="fb"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const state = { red:false, green:false, blue:false };
+const cRed = document.getElementById('cRed');
+const cGreen = document.getElementById('cGreen');
+const cBlue = document.getElementById('cBlue');
+const mixName = document.getElementById('mixName');
+
+const tRed = document.getElementById('tRed');
+const tGreen = document.getElementById('tGreen');
+const tBlue = document.getElementById('tBlue');
+
+function nameFor(s) {
+  const k = (s.red?'R':'') + (s.green?'G':'') + (s.blue?'B':'');
+  const map = {
+    '':   'Schwarz (alles aus)',
+    'R':  'Rot',
+    'G':  'Grün',
+    'B':  'Blau',
+    'RG': 'Gelb',
+    'RB': 'Magenta',
+    'GB': 'Cyan (Türkis)',
+    'RGB':'Weiß',
+  };
+  return map[k] || '';
+}
+
+function render() {
+  cRed.setAttribute('opacity',   state.red   ? 0.95 : 0);
+  cGreen.setAttribute('opacity', state.green ? 0.95 : 0);
+  cBlue.setAttribute('opacity',  state.blue  ? 0.95 : 0);
+  tRed.classList.toggle('on', state.red);
+  tGreen.classList.toggle('on', state.green);
+  tBlue.classList.toggle('on', state.blue);
+  mixName.textContent = nameFor(state);
+}
+
+tRed.onclick   = () => { state.red   = !state.red;   render(); };
+tGreen.onclick = () => { state.green = !state.green; render(); };
+tBlue.onclick  = () => { state.blue  = !state.blue;  render(); };
+render();
+
+// ---- Quiz ----
+const questions = [
+  { q: "Welche Farbe entsteht aus Rot + Grün + Blau (Licht)?", opts: ["Schwarz", "Weiß", "Braun"], correct: 1,
+    why: "Richtig! Alle drei zusammen ergeben Weiß." },
+  { q: "Rotes + grünes Licht ergibt …", opts: ["Gelb", "Blau", "Schwarz"], correct: 0,
+    why: "Genau! Rot und Grün mischen sich zu Gelb." },
+  { q: "Was passiert, wenn du gar kein Licht anmachst?", opts: ["Weiß", "Schwarz", "Grau"], correct: 1,
+    why: "Stimmt! Ohne Licht bleibt es schwarz." },
+  { q: "Blaues + grünes Licht ergibt …", opts: ["Cyan (Türkis)", "Rot", "Gelb"], correct: 0,
+    why: "Korrekt! Blau und Grün ergeben Cyan." },
+];
+let qi = 0;
+
+function loadQ() {
+  const item = questions[qi];
+  document.getElementById('qText').textContent = item.q;
+  const box = document.getElementById('opts'); box.innerHTML = '';
+  document.getElementById('fb').textContent = ''; document.getElementById('fb').className = 'feedback';
+  item.opts.forEach((o, i) => {
+    const b = document.createElement('button'); b.className = 'opt'; b.textContent = o;
+    b.onclick = () => answer(i, b); box.appendChild(b);
+  });
+}
+function answer(i, btn) {
+  const item = questions[qi]; const fb = document.getElementById('fb');
+  const all = document.querySelectorAll('.opt'); all.forEach(b => b.onclick = null);
+  if (i === item.correct) {
+    btn.classList.add('right'); fb.textContent = item.why; fb.className = 'feedback ok';
+    setTimeout(() => { qi = (qi + 1) % questions.length; loadQ(); }, 1600);
+  } else {
+    btn.classList.add('wrong'); all[item.correct].classList.add('right');
+    fb.textContent = "Nicht ganz – schau dir die richtige Antwort an."; fb.className = 'feedback no';
+    setTimeout(() => loadQ(), 2000);
+  }
+}
+loadQ();
+</script>
+</body>
+</html>
