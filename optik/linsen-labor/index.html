@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Linsen-Labor</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
+
+  :root {
+    --night: #0d1b2a;
+    --night-2: #16263a;
+    --beam: #ffd84d;
+    --lens: #7fdbff;
+    --lens-fill: rgba(127,219,255,0.18);
+    --object: #6bffb0;
+    --image: #ff9b6b;
+    --normal: #ff6b9d;
+    --ink: #eaf2ff;
+    --muted: #8ba3c7;
+    --correct: #6bffb0;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Fredoka', sans-serif;
+    background: radial-gradient(circle at 50% 0%, var(--night-2), var(--night));
+    color: var(--ink); min-height: 100vh; padding: 20px;
+    display: flex; justify-content: center;
+  }
+  .wrap { width: 100%; max-width: 920px; }
+  header { text-align: center; margin-bottom: 18px; }
+  .eyebrow { font-family: 'Space Mono', monospace; font-size: 12px; letter-spacing: 3px; text-transform: uppercase; color: var(--lens); }
+  h1 { font-size: 34px; font-weight: 700; letter-spacing: -1px; margin: 2px 0 6px; }
+  .sub { color: var(--muted); font-size: 15px; }
+
+  .stage {
+    position: relative; background: linear-gradient(180deg, #0a1622, #0e1f33);
+    border: 1px solid #24364f; border-radius: 20px; overflow: hidden;
+    box-shadow: 0 20px 50px rgba(0,0,0,.4); touch-action: none;
+  }
+  svg { display: block; width: 100%; height: auto; cursor: grab; }
+  svg.dragging { cursor: grabbing; }
+
+  .panel { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 16px; }
+  .card { background: #13243a; border: 1px solid #25395a; border-radius: 16px; padding: 16px 18px; }
+  .card h3 { font-size: 13px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+  .law { font-size: 15px; color: var(--ink); line-height: 1.5; }
+  .law strong { color: var(--correct); }
+  .status { font-family: 'Space Mono', monospace; font-size: 19px; font-weight: 700; color: var(--image); line-height: 1.5; }
+
+  .quiz { grid-column: 1 / -1; }
+  .quiz p.q { font-size: 17px; margin-bottom: 12px; font-weight: 500; }
+  .opts { display: flex; gap: 10px; flex-wrap: wrap; }
+  .opt {
+    font-family: 'Fredoka', sans-serif; font-size: 16px; font-weight: 500;
+    background: #1c3050; color: var(--ink); border: 2px solid transparent;
+    border-radius: 12px; padding: 12px 20px; cursor: pointer;
+    transition: transform .12s, background .2s, border-color .2s;
+  }
+  .opt:hover { transform: translateY(-2px); background: #244064; }
+  .opt.right { border-color: var(--correct); background: rgba(107,255,176,.15); }
+  .opt.wrong { border-color: #ff6b6b; background: rgba(255,107,107,.12); }
+  .feedback { margin-top: 12px; font-size: 15px; min-height: 22px; }
+  .feedback.ok { color: var(--correct); }
+  .feedback.no { color: #ff9b9b; }
+  .hint { text-align: center; color: var(--muted); font-size: 14px; margin-top: 12px; }
+
+  @media (max-width: 640px) { .panel { grid-template-columns: 1fr; } h1 { font-size: 26px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Physik · Optik</div>
+    <h1>Linsen-Labor</h1>
+    <p class="sub">Ziehe die Kerze und beobachte, wie die Linse ein Bild erzeugt.</p>
+  </header>
+
+  <div class="stage">
+    <svg id="sim" viewBox="0 0 800 420" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="3" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+
+      <!-- optical axis -->
+      <line x1="0" y1="210" x2="800" y2="210" stroke="#33506f" stroke-width="1.5" stroke-dasharray="6 6"/>
+
+      <!-- lens at center x=400 -->
+      <ellipse cx="400" cy="210" rx="20" ry="120" fill="var(--lens-fill)" stroke="var(--lens)" stroke-width="2.5"/>
+      <text x="400" y="350" text-anchor="middle" fill="var(--lens)" font-family="Fredoka" font-size="13">Sammellinse</text>
+
+      <!-- focal points -->
+      <circle cx="280" cy="210" r="4" fill="var(--normal)"/>
+      <text x="280" y="232" text-anchor="middle" fill="var(--normal)" font-family="Space Mono" font-size="12">F</text>
+      <circle cx="520" cy="210" r="4" fill="var(--normal)"/>
+      <text x="520" y="232" text-anchor="middle" fill="var(--normal)" font-family="Space Mono" font-size="12">F</text>
+
+      <!-- the three principal rays -->
+      <line id="rayParallel" stroke="var(--beam)" stroke-width="2" opacity="0.85"/>
+      <line id="rayParallel2" stroke="var(--beam)" stroke-width="2" opacity="0.85"/>
+      <line id="rayCenter" stroke="var(--beam)" stroke-width="2" opacity="0.6"/>
+
+      <!-- image arrow -->
+      <line id="imageArrow" stroke="var(--image)" stroke-width="4" stroke-linecap="round" filter="url(#glow)"/>
+      <polygon id="imageHead" fill="var(--image)"/>
+
+      <!-- object: a candle/arrow (draggable group), tip drawn relative -->
+      <g id="object" style="cursor:grab">
+        <line id="objArrow" x1="0" y1="0" x2="0" y2="-90" stroke="var(--object)" stroke-width="4" stroke-linecap="round" filter="url(#glow)"/>
+        <polygon points="-7,-82 7,-82 0,-96" fill="var(--object)"/>
+        <text x="0" y="22" text-anchor="middle" fill="var(--object)" font-family="Fredoka" font-size="13">Gegenstand</text>
+      </g>
+    </svg>
+  </div>
+
+  <p class="hint">Tipp: Ziehe den Gegenstand nach links und rechts.</p>
+
+  <div class="panel">
+    <div class="card">
+      <h3>Das Bild ist …</h3>
+      <p class="status" id="status">–</p>
+    </div>
+    <div class="card">
+      <h3>Was passiert hier?</h3>
+      <p class="law">Eine <strong>Sammellinse</strong> bündelt das Licht. Steht der Gegenstand weiter weg als der Brennpunkt <strong>F</strong>, entsteht ein <strong>umgekehrtes</strong> Bild auf der anderen Seite.</p>
+    </div>
+
+    <div class="card quiz">
+      <h3>Mini-Quiz</h3>
+      <p class="q" id="qText"></p>
+      <div class="opts" id="opts"></div>
+      <div class="feedback" id="fb"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const svg = document.getElementById('sim');
+const objG = document.getElementById('object');
+const objArrow = document.getElementById('objArrow');
+const rayParallel = document.getElementById('rayParallel');
+const rayParallel2 = document.getElementById('rayParallel2');
+const rayCenter = document.getElementById('rayCenter');
+const imageArrow = document.getElementById('imageArrow');
+const imageHead = document.getElementById('imageHead');
+const statusEl = document.getElementById('status');
+
+const AXIS = 210;          // optical axis y
+const LENS_X = 400;        // lens position
+const F = 120;             // focal length in px  (F at 280 and 520)
+let objX = 180;            // object position (left of lens)
+const OBJ_H = 90;          // object height (px above axis)
+
+function toSvg(evt) {
+  const pt = svg.createSVGPoint();
+  const t = evt.touches ? evt.touches[0] : evt;
+  pt.x = t.clientX; pt.y = t.clientY;
+  return pt.matrixTransform(svg.getScreenCTM().inverse());
+}
+
+function render() {
+  objX = Math.max(70, Math.min(LENS_X - 50, objX));
+  objG.setAttribute('transform', `translate(${objX},${AXIS})`);
+
+  const objTipY = AXIS - OBJ_H;
+  const g = LENS_X - objX;           // object distance from lens
+  // thin lens: 1/b = 1/f - 1/g
+  const b = 1 / (1/F - 1/g);         // image distance (positive => real image on right)
+
+  if (b > 0 && isFinite(b)) {
+    const imgX = LENS_X + b;
+    const magnification = b / g;     // image height factor
+    const imgH = OBJ_H * magnification;
+    const imgTipY = AXIS + imgH;     // inverted -> below axis
+
+    // Ray 1: parallel to axis -> through F on the right
+    rayParallel.setAttribute('x1', objX); rayParallel.setAttribute('y1', objTipY);
+    rayParallel.setAttribute('x2', LENS_X); rayParallel.setAttribute('y2', objTipY);
+    rayParallel2.setAttribute('x1', LENS_X); rayParallel2.setAttribute('y1', objTipY);
+    rayParallel2.setAttribute('x2', imgX); rayParallel2.setAttribute('y2', imgTipY);
+
+    // Ray 2: straight through lens center
+    rayCenter.setAttribute('x1', objX); rayCenter.setAttribute('y1', objTipY);
+    rayCenter.setAttribute('x2', imgX); rayCenter.setAttribute('y2', imgTipY);
+
+    // image arrow
+    imageArrow.setAttribute('x1', imgX); imageArrow.setAttribute('y1', AXIS);
+    imageArrow.setAttribute('x2', imgX); imageArrow.setAttribute('y2', imgTipY);
+    const hd = imgTipY > AXIS ? 14 : -14;
+    imageHead.setAttribute('points', `${imgX-7},${imgTipY-hd} ${imgX+7},${imgTipY-hd} ${imgX},${imgTipY}`);
+    imageArrow.style.display = ''; imageHead.style.display = '';
+
+    const sizeWord = Math.abs(magnification) > 1 ? "vergrößert" : "verkleinert";
+    statusEl.textContent = `umgekehrt & ${sizeWord}`;
+  } else {
+    // object inside focal length -> no real image
+    rayParallel.setAttribute('x1', objX); rayParallel.setAttribute('y1', objTipY);
+    rayParallel.setAttribute('x2', LENS_X); rayParallel.setAttribute('y2', objTipY);
+    rayParallel2.setAttribute('x1', LENS_X); rayParallel2.setAttribute('y1', objTipY);
+    rayParallel2.setAttribute('x2', 800); rayParallel2.setAttribute('y2', objTipY + (objTipY-AXIS)*2);
+    rayCenter.setAttribute('x1', objX); rayCenter.setAttribute('y1', objTipY);
+    rayCenter.setAttribute('x2', 800); rayCenter.setAttribute('y2', AXIS + (AXIS-objTipY)* (800-objX)/(LENS_X-objX) );
+    imageArrow.style.display = 'none'; imageHead.style.display = 'none';
+    statusEl.textContent = "kein echtes Bild (Lupe!)";
+  }
+}
+
+let dragging = false;
+function start(e){ dragging = true; svg.classList.add('dragging'); e.preventDefault(); }
+function move(e){ if(!dragging) return; const p = toSvg(e); objX = p.x; render(); e.preventDefault(); }
+function end(){ dragging = false; svg.classList.remove('dragging'); }
+objG.addEventListener('mousedown', start);
+objG.addEventListener('touchstart', start, {passive:false});
+window.addEventListener('mousemove', move);
+window.addEventListener('touchmove', move, {passive:false});
+window.addEventListener('mouseup', end);
+window.addEventListener('touchend', end);
+render();
+
+// ---- Quiz ----
+const questions = [
+  { q: "Was macht eine Sammellinse mit dem Licht?", opts: ["Sie bündelt es", "Sie zerstreut es", "Nichts"], correct: 0,
+    why: "Richtig! Eine Sammellinse bündelt die Lichtstrahlen." },
+  { q: "Steht der Gegenstand weit weg, ist das Bild …", opts: ["aufrecht", "umgekehrt", "unsichtbar"], correct: 1,
+    why: "Genau! Das reelle Bild steht auf dem Kopf." },
+  { q: "Wie heißt der Punkt F auf der Achse?", opts: ["Mittelpunkt", "Brennpunkt", "Nullpunkt"], correct: 1,
+    why: "Stimmt! F ist der Brennpunkt." },
+  { q: "Schiebst du den Gegenstand sehr nah an die Linse, wirkt sie wie eine …", opts: ["Lupe", "Wand", "Kerze"], correct: 0,
+    why: "Korrekt! Innerhalb des Brennpunkts wirkt sie als Lupe." },
+];
+let qi = 0;
+function loadQ() {
+  const item = questions[qi];
+  document.getElementById('qText').textContent = item.q;
+  const box = document.getElementById('opts'); box.innerHTML = '';
+  document.getElementById('fb').textContent = ''; document.getElementById('fb').className = 'feedback';
+  item.opts.forEach((o, i) => {
+    const b = document.createElement('button'); b.className = 'opt'; b.textContent = o;
+    b.onclick = () => answer(i, b); box.appendChild(b);
+  });
+}
+function answer(i, btn) {
+  const item = questions[qi]; const fb = document.getElementById('fb');
+  const all = document.querySelectorAll('.opt'); all.forEach(b => b.onclick = null);
+  if (i === item.correct) {
+    btn.classList.add('right'); fb.textContent = item.why; fb.className = 'feedback ok';
+    setTimeout(() => { qi = (qi + 1) % questions.length; loadQ(); }, 1600);
+  } else {
+    btn.classList.add('wrong'); all[item.correct].classList.add('right');
+    fb.textContent = "Nicht ganz – schau dir die richtige Antwort an."; fb.className = 'feedback no';
+    setTimeout(() => loadQ(), 2000);
+  }
+}
+loadQ();
+</script>
+</body>
+</html>
