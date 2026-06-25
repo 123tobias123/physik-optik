@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Schatten-Labor</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
+
+  :root {
+    --night: #0d1b2a;
+    --night-2: #16263a;
+    --beam: #ffd84d;
+    --beam-glow: #ffe98a;
+    --object: #c98a5a;
+    --object-edge: #e0a878;
+    --shadow: #060c14;
+    --normal: #ff6b9d;
+    --ink: #eaf2ff;
+    --muted: #8ba3c7;
+    --correct: #6bffb0;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Fredoka', sans-serif;
+    background: radial-gradient(circle at 50% 0%, var(--night-2), var(--night));
+    color: var(--ink);
+    min-height: 100vh;
+    padding: 20px;
+    display: flex;
+    justify-content: center;
+  }
+
+  .wrap { width: 100%; max-width: 920px; }
+  header { text-align: center; margin-bottom: 18px; }
+
+  .eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px; letter-spacing: 3px; text-transform: uppercase; color: var(--beam);
+  }
+  h1 { font-size: 34px; font-weight: 700; letter-spacing: -1px; margin: 2px 0 6px; }
+  .sub { color: var(--muted); font-size: 15px; }
+
+  .stage {
+    position: relative;
+    background: linear-gradient(180deg, #0a1622, #0e1f33);
+    border: 1px solid #24364f; border-radius: 20px; overflow: hidden;
+    box-shadow: 0 20px 50px rgba(0,0,0,.4); touch-action: none;
+  }
+  svg { display: block; width: 100%; height: auto; cursor: grab; }
+  svg.dragging { cursor: grabbing; }
+
+  .panel { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 16px; }
+  .card { background: #13243a; border: 1px solid #25395a; border-radius: 16px; padding: 16px 18px; }
+  .card h3 {
+    font-size: 13px; font-weight: 600; letter-spacing: 1.5px;
+    text-transform: uppercase; color: var(--muted); margin-bottom: 10px;
+  }
+  .law { font-size: 15px; color: var(--ink); line-height: 1.5; }
+  .law strong { color: var(--correct); }
+
+  .readout { display: flex; gap: 22px; }
+  .readout .box { flex: 1; }
+  .readout .label { font-size: 13px; color: var(--muted); }
+  .readout .val { font-family: 'Space Mono', monospace; font-size: 30px; font-weight: 700; color: var(--beam); }
+
+  .quiz { grid-column: 1 / -1; }
+  .quiz p.q { font-size: 17px; margin-bottom: 12px; font-weight: 500; }
+  .opts { display: flex; gap: 10px; flex-wrap: wrap; }
+  .opt {
+    font-family: 'Fredoka', sans-serif; font-size: 16px; font-weight: 500;
+    background: #1c3050; color: var(--ink); border: 2px solid transparent;
+    border-radius: 12px; padding: 12px 20px; cursor: pointer;
+    transition: transform .12s, background .2s, border-color .2s;
+  }
+  .opt:hover { transform: translateY(-2px); background: #244064; }
+  .opt.right { border-color: var(--correct); background: rgba(107,255,176,.15); }
+  .opt.wrong { border-color: #ff6b6b; background: rgba(255,107,107,.12); }
+
+  .feedback { margin-top: 12px; font-size: 15px; min-height: 22px; }
+  .feedback.ok { color: var(--correct); }
+  .feedback.no { color: #ff9b9b; }
+  .hint { text-align: center; color: var(--muted); font-size: 14px; margin-top: 12px; }
+
+  @media (max-width: 640px) { .panel { grid-template-columns: 1fr; } h1 { font-size: 26px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Physik · Optik</div>
+    <h1>Schatten-Labor</h1>
+    <p class="sub">Ziehe die Lampe und sieh, wie sich der Schatten verändert.</p>
+  </header>
+
+  <div class="stage">
+    <svg id="sim" viewBox="0 0 800 460" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="4" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+
+      <!-- ground / wall -->
+      <rect x="700" y="0" width="100" height="460" fill="#0a1622"/>
+      <rect x="700" y="0" width="6" height="460" fill="#33506f"/>
+      <text x="712" y="30" fill="var(--muted)" font-family="Fredoka" font-size="14" transform="rotate(90 712 30)">Wand</text>
+
+      <!-- light rays (filled by JS) -->
+      <polygon id="shadowZone" fill="var(--shadow)" opacity="0.9"/>
+      <line id="rayTop" stroke="var(--beam)" stroke-width="2.5" opacity="0.85" stroke-linecap="round"/>
+      <line id="rayBot" stroke="var(--beam)" stroke-width="2.5" opacity="0.85" stroke-linecap="round"/>
+
+      <!-- object (fixed) -->
+      <rect id="object" x="360" y="180" width="40" height="100" rx="6" fill="var(--object)" stroke="var(--object-edge)" stroke-width="2"/>
+      <text x="380" y="300" text-anchor="middle" fill="var(--muted)" font-family="Fredoka" font-size="13">Gegenstand</text>
+
+      <!-- shadow on wall (bright marker) -->
+      <rect id="wallShadow" x="700" width="6" fill="var(--normal)" opacity="0.9"/>
+
+      <!-- lamp (draggable) -->
+      <g id="lamp" style="cursor:grab">
+        <circle cx="0" cy="0" r="26" fill="var(--beam)" filter="url(#glow)"/>
+        <circle cx="0" cy="0" r="14" fill="#fff7d6"/>
+        <text x="0" y="46" text-anchor="middle" fill="var(--ink)" font-family="Fredoka" font-size="14" font-weight="600">Lampe</text>
+      </g>
+    </svg>
+  </div>
+
+  <p class="hint">Tipp: Ziehe die Lampe näher an den Gegenstand oder weiter weg.</p>
+
+  <div class="panel">
+    <div class="card">
+      <h3>Schatten an der Wand</h3>
+      <div class="readout">
+        <div class="box">
+          <div class="label">Schattenhöhe</div>
+          <div class="val"><span id="shadowH">–</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Was passiert hier?</h3>
+      <p class="law">Licht breitet sich <strong>geradlinig</strong> aus. Der Gegenstand hält es auf, dahinter entsteht ein <strong>Schatten</strong>. Je näher die Lampe, desto <strong>größer</strong> der Schatten.</p>
+    </div>
+
+    <div class="card quiz">
+      <h3>Mini-Quiz</h3>
+      <p class="q" id="qText"></p>
+      <div class="opts" id="opts"></div>
+      <div class="feedback" id="fb"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const svg = document.getElementById('sim');
+const lamp = document.getElementById('lamp');
+const rayTop = document.getElementById('rayTop');
+const rayBot = document.getElementById('rayBot');
+const shadowZone = document.getElementById('shadowZone');
+const wallShadow = document.getElementById('wallShadow');
+const shadowHEl = document.getElementById('shadowH');
+
+const WALL_X = 700;
+// object geometry (matches the rect above)
+const OBJ = { x: 360, w: 40, top: 180, bot: 280 };
+let lampPos = { x: 140, y: 230 };
+
+function toSvg(evt) {
+  const pt = svg.createSVGPoint();
+  const t = evt.touches ? evt.touches[0] : evt;
+  pt.x = t.clientX; pt.y = t.clientY;
+  return pt.matrixTransform(svg.getScreenCTM().inverse());
+}
+
+// project a ray from lamp through an edge point onto the wall (x = WALL_X)
+function projectToWall(ex, ey) {
+  const dx = ex - lampPos.x;
+  const dy = ey - lampPos.y;
+  const t = (WALL_X - lampPos.x) / dx;
+  return lampPos.y + dy * t;
+}
+
+function render() {
+  // keep lamp left of the object, within the scene
+  lampPos.x = Math.max(40, Math.min(OBJ.x - 30, lampPos.x));
+  lampPos.y = Math.max(40, Math.min(420, lampPos.y));
+  lamp.setAttribute('transform', `translate(${lampPos.x},${lampPos.y})`);
+
+  // rays grazing the top and bottom edges of the object (front face)
+  const topEdge = { x: OBJ.x, y: OBJ.top };
+  const botEdge = { x: OBJ.x, y: OBJ.bot };
+
+  const yTopWall = projectToWall(topEdge.x, topEdge.y);
+  const yBotWall = projectToWall(botEdge.x, botEdge.y);
+
+  rayTop.setAttribute('x1', lampPos.x); rayTop.setAttribute('y1', lampPos.y);
+  rayTop.setAttribute('x2', WALL_X);    rayTop.setAttribute('y2', yTopWall);
+  rayBot.setAttribute('x1', lampPos.x); rayBot.setAttribute('y1', lampPos.y);
+  rayBot.setAttribute('x2', WALL_X);    rayBot.setAttribute('y2', yBotWall);
+
+  // shadow zone polygon: from object edges to the wall
+  shadowZone.setAttribute('points',
+    `${OBJ.x},${OBJ.top} ${WALL_X},${yTopWall} ${WALL_X},${yBotWall} ${OBJ.x},${OBJ.bot}`);
+
+  // shadow marker on the wall
+  const hi = Math.min(yTopWall, yBotWall);
+  const lo = Math.max(yTopWall, yBotWall);
+  wallShadow.setAttribute('y', hi);
+  wallShadow.setAttribute('height', Math.max(0, lo - hi));
+
+  // readout: shadow height relative to object height (100 px)
+  const ratio = (lo - hi) / (OBJ.bot - OBJ.top);
+  shadowHEl.textContent = ratio.toFixed(1) + "×";
+}
+
+// drag handling
+let dragging = false;
+function start(e){ dragging = true; svg.classList.add('dragging'); e.preventDefault(); }
+function move(e){ if(!dragging) return; const p = toSvg(e); lampPos.x = p.x; lampPos.y = p.y; render(); e.preventDefault(); }
+function end(){ dragging = false; svg.classList.remove('dragging'); }
+
+lamp.addEventListener('mousedown', start);
+lamp.addEventListener('touchstart', start, {passive:false});
+window.addEventListener('mousemove', move);
+window.addEventListener('touchmove', move, {passive:false});
+window.addEventListener('mouseup', end);
+window.addEventListener('touchend', end);
+
+render();
+
+// ---- Quiz ----
+const questions = [
+  { q: "Wie breitet sich Licht aus?", opts: ["Im Bogen", "Geradlinig", "Im Zickzack"], correct: 1,
+    why: "Richtig! Licht breitet sich geradlinig aus." },
+  { q: "Du schiebst die Lampe näher an den Gegenstand. Der Schatten wird …", opts: ["größer", "kleiner", "verschwindet"], correct: 0,
+    why: "Genau! Näher dran = größerer Schatten." },
+  { q: "Warum entsteht überhaupt ein Schatten?", opts: ["Die Wand leuchtet", "Der Gegenstand hält das Licht auf", "Das Licht wird müde"], correct: 1,
+    why: "Stimmt! Der Gegenstand blockiert das Licht." },
+  { q: "Wo ist es hinter dem Gegenstand am dunkelsten?", opts: ["Im Kernschatten", "Im Licht", "An der Lampe"], correct: 0,
+    why: "Korrekt! Dort kommt gar kein Licht hin – der Kernschatten." },
+];
+let qi = 0;
+
+function loadQ() {
+  const item = questions[qi];
+  document.getElementById('qText').textContent = item.q;
+  const box = document.getElementById('opts'); box.innerHTML = '';
+  document.getElementById('fb').textContent = ''; document.getElementById('fb').className = 'feedback';
+  item.opts.forEach((o, i) => {
+    const b = document.createElement('button'); b.className = 'opt'; b.textContent = o;
+    b.onclick = () => answer(i, b); box.appendChild(b);
+  });
+}
+function answer(i, btn) {
+  const item = questions[qi]; const fb = document.getElementById('fb');
+  const all = document.querySelectorAll('.opt'); all.forEach(b => b.onclick = null);
+  if (i === item.correct) {
+    btn.classList.add('right'); fb.textContent = item.why; fb.className = 'feedback ok';
+    setTimeout(() => { qi = (qi + 1) % questions.length; loadQ(); }, 1600);
+  } else {
+    btn.classList.add('wrong'); all[item.correct].classList.add('right');
+    fb.textContent = "Nicht ganz – schau dir die richtige Antwort an."; fb.className = 'feedback no';
+    setTimeout(() => loadQ(), 2000);
+  }
+}
+loadQ();
+</script>
+</body>
+</html>
