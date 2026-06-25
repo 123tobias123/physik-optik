@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Physik-Optik · Lernspiele</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
+
+  :root {
+    --night: #0d1b2a;
+    --night-2: #16263a;
+    --beam: #ffd84d;
+    --mirror: #7fdbff;
+    --water: #2a9fd6;
+    --normal: #ff6b9d;
+    --ink: #eaf2ff;
+    --muted: #8ba3c7;
+    --card: #13243a;
+    --card-edge: #25395a;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Fredoka', sans-serif;
+    background: radial-gradient(circle at 50% 0%, var(--night-2), var(--night));
+    color: var(--ink);
+    min-height: 100vh;
+    padding: 40px 20px;
+    display: flex;
+    justify-content: center;
+  }
+
+  .wrap { width: 100%; max-width: 880px; }
+
+  header { text-align: center; margin-bottom: 38px; }
+
+  .eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: var(--mirror);
+  }
+
+  h1 {
+    font-size: 42px;
+    font-weight: 700;
+    letter-spacing: -1.5px;
+    margin: 6px 0 10px;
+  }
+
+  .sub { color: var(--muted); font-size: 16px; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 18px;
+  }
+
+  .tile {
+    display: block;
+    text-decoration: none;
+    color: var(--ink);
+    background: var(--card);
+    border: 1px solid var(--card-edge);
+    border-radius: 18px;
+    padding: 26px 24px;
+    transition: transform .15s, border-color .2s, box-shadow .2s;
+    position: relative;
+    overflow: hidden;
+  }
+  .tile:hover {
+    transform: translateY(-4px);
+    border-color: var(--mirror);
+    box-shadow: 0 14px 30px rgba(0,0,0,.35);
+  }
+  .tile .icon { font-size: 34px; margin-bottom: 14px; display: block; }
+  .tile h2 { font-size: 21px; font-weight: 600; margin-bottom: 6px; }
+  .tile p { color: var(--muted); font-size: 14px; line-height: 1.45; }
+  .tile .go {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--beam);
+    margin-top: 14px;
+    display: inline-block;
+  }
+
+  .state {
+    text-align: center;
+    color: var(--muted);
+    font-size: 16px;
+    padding: 50px 0;
+  }
+
+  footer {
+    text-align: center;
+    color: var(--muted);
+    font-size: 13px;
+    margin-top: 44px;
+  }
+
+  @media (max-width: 520px) {
+    h1 { font-size: 32px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Mittelschule · Physik</div>
+    <h1>Optik-Lernspiele</h1>
+    <p class="sub">Interaktive Simulationen zum Ausprobieren und Verstehen.</p>
+  </header>
+
+  <div id="grid" class="grid"></div>
+  <div id="state" class="state">Lade Spiele …</div>
+
+  <footer>Tippe auf ein Spiel, um es zu starten.</footer>
+</div>
+
+<script>
+// === Anpassen, falls sich Benutzername oder Repo ändern ===
+const OWNER = "123tobias123";
+const REPO  = "physik-optik";
+const FOLDER = "optik";           // Ordner, in dem die Spiele liegen
+// ==========================================================
+
+// Schöne Titel & Beschreibungen je Ordnername.
+// Unbekannte Ordner bekommen automatisch einen Standard-Eintrag.
+const META = {
+  "spiegel-labor":   { icon: "🪞", title: "Spiegel-Labor",   desc: "Reflexion erforschen: Einfallswinkel = Ausfallswinkel." },
+  "brechungs-labor": { icon: "💧", title: "Brechungs-Labor", desc: "Wie Licht im Wasser und Glas den Knick macht." },
+};
+
+function prettify(name) {
+  return name.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+}
+
+async function load() {
+  const grid = document.getElementById('grid');
+  const state = document.getElementById('state');
+  const apiURL = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${FOLDER}`;
+
+  try {
+    const res = await fetch(apiURL);
+    if (!res.ok) throw new Error("API " + res.status);
+    const items = await res.json();
+
+    const folders = items.filter(i => i.type === "dir");
+    if (folders.length === 0) {
+      state.textContent = "Noch keine Spiele vorhanden.";
+      return;
+    }
+
+    state.style.display = "none";
+
+    folders.forEach(f => {
+      const m = META[f.name] || { icon: "✨", title: prettify(f.name), desc: "Interaktive Optik-Simulation." };
+      const a = document.createElement('a');
+      a.className = "tile";
+      a.href = `${FOLDER}/${f.name}/`;
+      a.innerHTML = `
+        <span class="icon">${m.icon}</span>
+        <h2>${m.title}</h2>
+        <p>${m.desc}</p>
+        <span class="go">Spiel starten →</span>`;
+      grid.appendChild(a);
+    });
+  } catch (err) {
+    // Fallback: zeige zumindest die bekannten Spiele, falls die API klemmt
+    state.style.display = "none";
+    Object.keys(META).forEach(name => {
+      const m = META[name];
+      const a = document.createElement('a');
+      a.className = "tile";
+      a.href = `${FOLDER}/${name}/`;
+      a.innerHTML = `
+        <span class="icon">${m.icon}</span>
+        <h2>${m.title}</h2>
+        <p>${m.desc}</p>
+        <span class="go">Spiel starten →</span>`;
+      grid.appendChild(a);
+    });
+  }
+}
+
+load();
+</script>
+</body>
+</html>
